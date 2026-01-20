@@ -1,0 +1,11 @@
+C:\dev\BobaniSim\Bobani.Engine\bin\Debug\net8.0\Bobani.Engine.deps.json
+C:\dev\BobaniSim\Bobani.Engine\bin\Debug\net8.0\Bobani.Engine.dll
+C:\dev\BobaniSim\Bobani.Engine\bin\Debug\net8.0\Bobani.Engine.pdb
+C:\dev\BobaniSim\Bobani.Engine\obj\Debug\net8.0\Bobani.Engine.GeneratedMSBuildEditorConfig.editorconfig
+C:\dev\BobaniSim\Bobani.Engine\obj\Debug\net8.0\Bobani.Engine.AssemblyInfoInputs.cache
+C:\dev\BobaniSim\Bobani.Engine\obj\Debug\net8.0\Bobani.Engine.AssemblyInfo.cs
+C:\dev\BobaniSim\Bobani.Engine\obj\Debug\net8.0\Bobani.Engine.csproj.CoreCompileInputs.cache
+C:\dev\BobaniSim\Bobani.Engine\obj\Debug\net8.0\Bobani.Engine.dll
+C:\dev\BobaniSim\Bobani.Engine\obj\Debug\net8.0\refint\Bobani.Engine.dll
+C:\dev\BobaniSim\Bobani.Engine\obj\Debug\net8.0\Bobani.Engine.pdb
+C:\dev\BobaniSim\Bobani.Engine\obj\Debug\net8.0\ref\Bobani.Engine.dll
