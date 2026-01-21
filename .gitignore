@@ -1,0 +1,20 @@
+## .NET build artifacts
+bin/
+obj/
+*.dll
+*.exe
+*.pdb
+*.cache
+
+## Visual Studio / Rider
+.vs/
+.idea/
+*.user
+*.suo
+
+## OS
+.DS_Store
+Thumbs.db
+
+## Data files (if you want to exclude CSV files, uncomment next line)
+# Data/
