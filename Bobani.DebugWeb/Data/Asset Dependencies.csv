@@ -1,0 +1,22 @@
+﻿Activity,Object,Parent Object,Object Location
+Sleep,Bed,Bed,Room
+Drunk Sleep,Bed,Bed,Room
+High Sleep,Bed,Bed,Room
+Couch + TV,Couch,Couch,Room
+Game Console,Game Console,Couch,Room
+Computer,Computer,Computer,Room
+Couch + Weed,Weed,Couch,Room
+Couch + Beer,Beer,Couch,Room
+Outside: Friends Drinking,Beer,Bar,Outside
+Outside: Friends Smoking,Weed,Park,Outside
+Outside: Flirting,Hookup Potential,Nightclub,Outside
+Outside: Movie,Movie,Theater,Outside
+Outside: Pickleball,Pickleball Court,Gym,Outside
+Outside: Cards,Card Table,Friends Garage,Outside
+Couch + Vibing,Couch,Couch,Room
+Ordering Food + Eating,Food,Couch,Room
+Outside: Friends Eating,Food,Restaurant,Outside
+Taking headache medicine,Kitchen Counter,Kitchen,Room
+Taking sleeping pill,Kitchen Counter,Kitchen,Room
+Napping,Couch,Couch,Room
+Moving In,Couch,Couch,Room

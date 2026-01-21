@@ -1,5 +1,6 @@
 using System.Text;
 using System.Collections.Concurrent;
+using System.Globalization;
 using Bobani.Engine;
 
 var builder = WebApplication.CreateBuilder(args);
@@ -26,6 +27,18 @@ foreach (var mood in initialMoods)
 }
 
 builder.Services.AddSingleton(moodsService);
+
+// Load activities from CSV
+var activities = LoadActivitiesFromCsv();
+builder.Services.AddSingleton<List<ActivityRow>>(activities);
+
+// Load activity time rules from CSV
+var timeRules = LoadActivityTimeRulesFromCsv();
+builder.Services.AddSingleton<List<ActivityTimeRule>>(timeRules);
+
+// Track current activity (default: "Moving In")
+var currentActivityService = new ConcurrentDictionary<string, string> { ["current"] = "Moving In" };
+builder.Services.AddSingleton<ConcurrentDictionary<string, string>>(currentActivityService);
 
 var app = builder.Build();
 
@@ -65,23 +78,33 @@ app.MapGet("/edit-moods", () =>
 List<MoodRow> GetMoodsTable(ConcurrentDictionary<string, MoodRow> moods) => moods.Values.ToList();
 
 // Human-readable report page
-app.MapGet("/", (DecisionEngine engine, ConcurrentDictionary<string, MoodRow> moods) =>
+app.MapGet("/", (DecisionEngine engine, ConcurrentDictionary<string, MoodRow> moods, 
+    List<ActivityRow> activities, List<ActivityTimeRule> timeRules, 
+    ConcurrentDictionary<string, string> currentActivity) =>
 {
-    var result = engine.SelectMood(GetMoodsTable(moods));
-    var html = RenderReportHtml(result);
+    var moodResult = engine.SelectMood(GetMoodsTable(moods));
+    var currentTime = DateTime.Now;
+    var currentAct = currentActivity.GetValueOrDefault("current", "Moving In");
+    var activityResult = engine.FilterActivities(currentAct, activities, timeRules, currentTime);
+    var html = RenderReportHtml(moodResult, activityResult);
     return Results.Content(html, "text/html");
 });
 
 // Keep JSON endpoint for detailed debugging
-app.MapGet("/step", (DecisionEngine engine, ConcurrentDictionary<string, MoodRow> moods) =>
+app.MapGet("/step", (DecisionEngine engine, ConcurrentDictionary<string, MoodRow> moods,
+    List<ActivityRow> activities, List<ActivityTimeRule> timeRules,
+    ConcurrentDictionary<string, string> currentActivity) =>
 {
-    var result = engine.SelectMood(GetMoodsTable(moods));
-    return Results.Ok(result);
+    var moodResult = engine.SelectMood(GetMoodsTable(moods));
+    var currentTime = DateTime.Now;
+    var currentAct = currentActivity.GetValueOrDefault("current", "Moving In");
+    var activityResult = engine.FilterActivities(currentAct, activities, timeRules, currentTime);
+    return Results.Ok(new { Mood = moodResult, Activity = activityResult });
 });
 
 app.Run();
 
-static string RenderReportHtml(MoodSelectionResult r)
+static string RenderReportHtml(MoodSelectionResult moodResult, ActivityFilterResult activityResult)
 {
     string Row(MoodRow m) =>
         $"<tr><td>{Escape(m.MoodName)}</td><td>{m.CurrentMood:0.##}</td><td>{m.StartingRankMorning}</td></tr>";
@@ -100,22 +123,18 @@ static string RenderReportHtml(MoodSelectionResult r)
         return sb.ToString();
     }
 
-    var modeLabel = r.SelectionMode == "OUTLIER" ? "Outlier path" : "IQR random path";
+    var modeLabel = moodResult.SelectionMode == "OUTLIER" ? "Outlier path" : "IQR random path";
 
-    var summary = $@"
+    var moodSummary = $@"
       <div class='card'>
-        <h3>Step 1 Summary</h3>
+        <h3>Step 1: Mood Selection</h3>
         <div class='grid2'>
           <div><b>Mode:</b> {modeLabel}</div>
-          <div><b>Selected Mood:</b> <span class='pill'>{Escape(r.SelectedMood)}</span></div>
-          <div><b>Q1:</b> {r.Q1:0.###}</div>
-          <div><b>Q3:</b> {r.Q3:0.###}</div>
-          <div><b>IQR:</b> {r.IQR:0.###}</div>
-          <div><b>Lower Fence:</b> {r.LowerFence:0.###}</div>
+          <div><b>Selected Mood:</b> <span class='pill'>{Escape(moodResult.SelectedMood)}</span></div>
         </div>
       </div>";
 
-    var explanation = r.SelectionMode == "OUTLIER"
+    var moodExplanation = moodResult.SelectionMode == "OUTLIER"
         ? $@"<div class='callout good'>
               <b>Outliers detected.</b> Bobani considered only the low outliers, then picked the top one by Starting Rank (AM).
             </div>"
@@ -123,10 +142,76 @@ static string RenderReportHtml(MoodSelectionResult r)
               <b>No outliers detected.</b> Bobani picked randomly from the IQR pool (moods with Current Mood between Q1 and Q3).
             </div>";
 
-    var sortedTable = Table("Sorted Moods (low → high)", r.SortedMoodsLowToHigh);
-    var outliersTable = Table("Outliers (low)", r.OutliersLow);
-    var topCandidatesTable = Table("Top Outlier Candidates (by Starting Rank AM)", r.TopOutlierCandidates);
-    var iqrPoolTable = Table("IQR Pool (random pick group)", r.IqrPool);
+    // Step 2: Activity Section
+    var currentActivityName = activityResult.CurrentActivity;
+    var currentActivityDetails = activityResult.CurrentActivityDetails;
+    
+    string FormatActivityDetails(ActivityRow? activity)
+    {
+        if (activity == null) return "<div class='muted'>Activity not found in database</div>";
+        
+        return $@"
+        <div class='grid2'>
+          <div><b>Energy Points:</b> {activity.EnergyPoints}</div>
+          <div><b>Not Hangover Points:</b> {activity.NotHangoverPoints}</div>
+          <div><b>Not Boredom Points:</b> {activity.NotBoredomPoints}</div>
+          <div><b>Not Loneliness Points:</b> {activity.NotLonelinessPoints}</div>
+          <div><b>Drunk Points:</b> {activity.DrunkPoints}</div>
+          <div><b>High Points:</b> {activity.HighPoints}</div>
+          <div><b>Satiaity Points:</b> {activity.SatiaityPoints}</div>
+          <div><b>Enlightenment Points:</b> {activity.EnlightenmentPoints}</div>
+          <div><b>MU Threshold:</b> {(activity.MuThreshold.HasValue ? activity.MuThreshold.Value.ToString() : "N/A")}</div>
+          <div><b>Time Variance Low:</b> {activity.TimeVarianceLow}</div>
+          <div><b>Time Variance High:</b> {activity.TimeVarianceHigh}</div>
+          <div><b>Defaulted:</b> {(activity.Defaulted ? "Y" : "N")}</div>
+          <div><b>Activity Type:</b> {Escape(activity.ActivityType)}</div>
+          <div><b>Duration Activity:</b> {(activity.DurationActivity ? "Y" : "N")}</div>
+          <div><b>Past Bedtime:</b> {(activity.PastBedtime ? "Y" : "N")}</div>
+        </div>";
+    }
+
+    string ActivityTable(string title, List<ActivityRow> activities)
+    {
+        if (activities.Count == 0)
+            return $@"<div class='card'><h3>{title}</h3><div class='muted'>None</div></div>";
+
+        var sb = new StringBuilder();
+        sb.Append($@"<div class='card'><h3>{title}</h3><table><thead>
+            <tr><th>Activity Name</th><th>Activity Type</th><th>Past Bedtime</th></tr>
+            </thead><tbody>");
+        foreach (var a in activities)
+        {
+            sb.Append($"<tr><td>{Escape(a.ActivityName)}</td><td>{Escape(a.ActivityType)}</td><td>{(a.PastBedtime ? "Y" : "N")}</td></tr>");
+        }
+        sb.Append("</tbody></table></div>");
+        return sb.ToString();
+    }
+
+    var activitySummary = $@"
+      <div class='card'>
+        <h3>Step 2: Activity Selection</h3>
+        <div class='grid2'>
+          <div><b>Current Activity:</b> <span class='pill'>{Escape(currentActivityName)}</span></div>
+          <div><b>Current Time:</b> {activityResult.CurrentTime:yyyy-MM-dd HH:mm:ss}</div>
+        </div>
+        {FormatActivityDetails(currentActivityDetails)}
+      </div>";
+
+    var activityExplanation = $@"
+      <div class='callout'>
+        <b>Activity Filtering Process:</b><br/>
+        • After Time Rule Filter: {activityResult.ActivitiesAfterTimeRuleFilter.Count} activities<br/>
+        • After Bedtime Filter: {activityResult.ActivitiesAfterBedtimeFilter.Count} activities<br/>
+        • Final Available: {activityResult.FinalAvailableActivities.Count} activities
+      </div>";
+
+    var sortedTable = Table("Sorted Moods (low → high)", moodResult.SortedMoodsLowToHigh);
+    var outliersTable = Table("Outliers (low)", moodResult.OutliersLow);
+    var topCandidatesTable = Table("Top Outlier Candidates (by Starting Rank AM)", moodResult.TopOutlierCandidates);
+    
+    var activitiesAfterTimeRuleTable = ActivityTable("Activities After Time Rule Filter", activityResult.ActivitiesAfterTimeRuleFilter);
+    var activitiesAfterBedtimeTable = ActivityTable("Activities After Bedtime Filter", activityResult.ActivitiesAfterBedtimeFilter);
+    var finalActivitiesTable = ActivityTable("Final Available Activities", activityResult.FinalAvailableActivities);
 
     var html = $@"
 <!doctype html>
@@ -163,8 +248,8 @@ static string RenderReportHtml(MoodSelectionResult r)
     <a class='btn' href='/'>Run Again</a>
   </div>
 
-  {summary}
-  {explanation}
+  {moodSummary}
+  {moodExplanation}
 
   <div class='cols'>
     {sortedTable}
@@ -173,7 +258,18 @@ static string RenderReportHtml(MoodSelectionResult r)
 
   <div class='cols'>
     {topCandidatesTable}
-    {iqrPoolTable}
+  </div>
+
+  {activitySummary}
+  {activityExplanation}
+
+  <div class='cols'>
+    {activitiesAfterTimeRuleTable}
+    {activitiesAfterBedtimeTable}
+  </div>
+
+  <div class='cols'>
+    {finalActivitiesTable}
   </div>
 </body>
 </html>";
@@ -183,6 +279,7 @@ static string RenderReportHtml(MoodSelectionResult r)
 
 static string Escape(string s) =>
     s.Replace("&", "&amp;").Replace("<", "&lt;").Replace(">", "&gt;");
+
 
 static string RenderEditableMoodsTable()
 {
@@ -221,7 +318,7 @@ static string RenderEditableMoodsTable()
       <div class='muted'>Update the Starting Rank (AM) for each mood. Lower numbers = higher priority.</div>
     </div>
     <div>
-      <a class='btn' href='/'>Decision Dashboard</a>
+      <a class='btn' href='/'>View Results</a>
       <button class='btn btn-primary' onclick='saveAll()'>Save All Changes</button>
     </div>
   </div>
@@ -362,3 +459,203 @@ static string RenderEditableMoodsTable()
     return html;
 }
 
+static List<ActivityRow> LoadActivitiesFromCsv()
+{
+    var activities = new List<ActivityRow>();
+    var csvFileName = "Bobani Activities.csv";
+    var possiblePaths = new[]
+    {
+        Path.Combine(Directory.GetCurrentDirectory(), "Data", csvFileName),
+        Path.Combine(AppContext.BaseDirectory, "Data", csvFileName),
+        Path.Combine(AppContext.BaseDirectory, "..", "..", "..", "Data", csvFileName),
+        "Data/Bobani Activities.csv"
+    };
+
+    string? csvPath = null;
+    foreach (var path in possiblePaths)
+    {
+        if (File.Exists(path))
+        {
+            csvPath = path;
+            break;
+        }
+    }
+
+    if (csvPath == null || !File.Exists(csvPath))
+    {
+        Console.WriteLine($"WARNING: Could not find {csvFileName}");
+        return activities;
+    }
+
+    var lines = File.ReadAllLines(csvPath);
+    if (lines.Length < 2) return activities;
+
+    for (int i = 1; i < lines.Length; i++)
+    {
+        if (string.IsNullOrWhiteSpace(lines[i])) continue;
+        
+        var values = ParseCsvLine(lines[i]);
+        if (values.Count < 16) continue;
+
+        try
+        {
+            var activity = new ActivityRow(
+                ActivityName: values[0].Trim(),
+                EnergyPoints: ParseDouble(values[1]),
+                NotHangoverPoints: ParseDouble(values[2]),
+                NotBoredomPoints: ParseDouble(values[3]),
+                NotLonelinessPoints: ParseDouble(values[4]),
+                DrunkPoints: ParseDouble(values[5]),
+                HighPoints: ParseDouble(values[6]),
+                SatiaityPoints: ParseDouble(values[7]),
+                EnlightenmentPoints: ParseDouble(values[8]),
+                MuThreshold: ParseDoubleOrNull(values[9]),
+                TimeVarianceLow: ParseDouble(values[10]),
+                TimeVarianceHigh: ParseDouble(values[11]),
+                Defaulted: values[12].Trim().Equals("Y", StringComparison.OrdinalIgnoreCase),
+                ActivityType: values[13].Trim(),
+                DurationActivity: values[14].Trim().Equals("Y", StringComparison.OrdinalIgnoreCase),
+                PastBedtime: values[15].Trim().Equals("Y", StringComparison.OrdinalIgnoreCase)
+            );
+            activities.Add(activity);
+        }
+        catch { }
+    }
+
+    Console.WriteLine($"Loaded {activities.Count} activities from {csvPath}");
+    return activities;
+}
+
+static List<ActivityTimeRule> LoadActivityTimeRulesFromCsv()
+{
+    var rules = new List<ActivityTimeRule>();
+    var csvFileName = "Activity Time Rule.csv";
+    var possiblePaths = new[]
+    {
+        Path.Combine(Directory.GetCurrentDirectory(), "Data", csvFileName),
+        Path.Combine(AppContext.BaseDirectory, "Data", csvFileName),
+        Path.Combine(AppContext.BaseDirectory, "..", "..", "..", "Data", csvFileName),
+        "Data/Activity Time Rule.csv"
+    };
+
+    string? csvPath = null;
+    foreach (var path in possiblePaths)
+    {
+        if (File.Exists(path))
+        {
+            csvPath = path;
+            break;
+        }
+    }
+
+    if (csvPath == null || !File.Exists(csvPath))
+    {
+        Console.WriteLine($"WARNING: Could not find {csvFileName}");
+        return rules;
+    }
+
+    var lines = File.ReadAllLines(csvPath);
+    if (lines.Length < 2) return rules;
+
+    for (int i = 1; i < lines.Length; i++)
+    {
+        if (string.IsNullOrWhiteSpace(lines[i])) continue;
+        
+        var values = ParseCsvLine(lines[i]);
+        if (values.Count < 3) continue;
+
+        try
+        {
+            var activityName = values[0].Trim();
+            var tlbStr = values[1].Trim();
+            var tubStr = values[2].Trim();
+
+            TimeSpan? tlb = ParseTimeSpan(tlbStr);
+            TimeSpan? tub = ParseTimeSpan(tubStr);
+
+            rules.Add(new ActivityTimeRule(
+                ActivityName: activityName,
+                TimeLowerBound: tlb,
+                TimeUpperBound: tub
+            ));
+        }
+        catch { }
+    }
+
+    Console.WriteLine($"Loaded {rules.Count} time rules from {csvPath}");
+    return rules;
+}
+
+static TimeSpan? ParseTimeSpan(string timeStr)
+{
+    if (string.IsNullOrWhiteSpace(timeStr)) return null;
+
+    // Handle formats like "10:00 p.m.", "7:00 a.m.", "2:00 a.m."
+    timeStr = timeStr.Trim().ToLower();
+    
+    bool isPM = timeStr.Contains("p.m.") || timeStr.Contains("pm");
+    timeStr = timeStr.Replace("p.m.", "").Replace("pm", "").Replace("a.m.", "").Replace("am", "").Trim();
+    
+    if (TimeSpan.TryParse(timeStr, out var time))
+    {
+        if (isPM && time.Hours < 12)
+        {
+            time = time.Add(TimeSpan.FromHours(12));
+        }
+        else if (!isPM && time.Hours == 12)
+        {
+            time = time.Subtract(TimeSpan.FromHours(12));
+        }
+        return time;
+    }
+
+    return null;
+}
+
+static List<string> ParseCsvLine(string line)
+{
+    var result = new List<string>();
+    var current = new StringBuilder();
+    bool inQuotes = false;
+
+    foreach (char c in line)
+    {
+        if (c == '"')
+        {
+            inQuotes = !inQuotes;
+        }
+        else if (c == ',' && !inQuotes)
+        {
+            result.Add(current.ToString());
+            current.Clear();
+        }
+        else
+        {
+            current.Append(c);
+        }
+    }
+    result.Add(current.ToString());
+    return result;
+}
+
+static double ParseDouble(string value)
+{
+    if (string.IsNullOrWhiteSpace(value) || value.Equals("NA", StringComparison.OrdinalIgnoreCase))
+        return 0;
+    
+    if (double.TryParse(value.Trim(), NumberStyles.Float, CultureInfo.InvariantCulture, out var result))
+        return result;
+    
+    return 0;
+}
+
+static double? ParseDoubleOrNull(string value)
+{
+    if (string.IsNullOrWhiteSpace(value) || value.Equals("NA", StringComparison.OrdinalIgnoreCase))
+        return null;
+    
+    if (double.TryParse(value.Trim(), NumberStyles.Float, CultureInfo.InvariantCulture, out var result))
+        return result;
+    
+    return null;
+}

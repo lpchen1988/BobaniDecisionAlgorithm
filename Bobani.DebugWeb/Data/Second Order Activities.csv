@@ -1,0 +1,4 @@
+﻿Activity,Energy (pts|mult),Energy M,Not Hangover (pts|mult),Not Hangover M,Not Boredom (pts|mult),Not Boredom M,Not Loneliness (pts|mult),Not Loneliness M,Drunk (pts|mult),Drunk M,High (pts|mult),High M,Satiaty,Satiaty M,Enlightenment,Enlightenment M,MU Threshold,Time Variance Low,Time Variance High,Defaulted,Activity Type,Associated Activity,Past Bedtime
+Romancing Woman Drinking,-0.5,1,0,1,3,1,4,1,0.5,1,0,1,0,1,0,1,8,1,1,N,Mixed,Outside: Clubbing,Y
+Romancing Woman Weed,-0.5,1,0,1,3,1,4,1,0,2,1,1,0,1,0,1,8,1,1,N,Mixed,Outside: Clubbing,Y
+Romancing Woman Sober,-0.5,1,0,1,3,1,4,1,0,1,0,1,0,1,0,1,8,1,1,N,Mixed,Outside: Clubbing,Y

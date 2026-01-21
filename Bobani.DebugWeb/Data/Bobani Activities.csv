@@ -1,0 +1,23 @@
+Activity,Energy (pts|mult),Not Hangover (pts|mult),Not Boredom (pts|mult),Not Loneliness (pts|mult),Drunk (pts|mult),High (pts|mult),Satiaty,Enlightenment,MU Threshold,TVL,TVH,Defaulted,Activity Type,Duration Activity?,Past Bedtime
+Sleep,1,0,-10,-10,0,0,-0.5,0,10,1,1,Y,Internal,Y,Y
+Drunk Sleep,0.75,-1,-8,-6,-1,0,-1,0,10,1,1,Y,Internal,Y,Y
+High Sleep,0.75,0,-10,-10,0,-1,-0.5,0,10,1,1,Y,Internal,Y,Y
+Crunk Sleep,0.75,-1,-10,-10,-1,-1,-1,0,10,1,1,Y,Internal,Y,Y
+Couch + TV,1,1,1,-0.5,-0.5,0,-0.5,0.3,5,1,1,N,Internal,Y,N
+Game Console,-1,1,2,-0.5,-0.5,0,-1,0.3,5,1,1,N,Internal,Y,N
+Computer,-1,1,2,-0.5,-0.5,0,-1,0.3,5,1,1,N,Internal,Y,N
+Couch + Weed,-0.25,1,3,1,-0.5,3,-4,0,8,1,1,N,Internal,Y,N
+Couch + Beer,1,2,3,1,3,0,-2,0,8,1,1,N,Internal,Y,N
+Outside: Friends Drinking,-2,2,3,4,3,0,-2,0,8,1,1,N,Internal,Y,N
+Outside: Friends Smoking,0,2,3,4,-0.5,3,-4,0,8,1,1,N,Internal,Y,N
+Outside: Clubbing,-2,1,3,4,0.5,0,-0.3,0,8,1,1,N,Internal,Y,Y
+Outside: Movie,-1,1,3,1,-0.5,0,-0.5,0.3,6,0,0,N,Internal,Y,N
+Outside: Pickleball,-3,1,3,2,-1,0,-1,0,5,1,1,N,Internal,Y,N
+Outside: Cards,-2,1,2,4,1,0,-1,0,5,1,1,N,Internal,Y,N
+Couch + Vibing,2,1.3,-1,-0.7,-0.5,0,-2,0,2,1,1,N,Internal,Y,N
+Ordering Food + Eating,3,4,1,0,-0.4,0,10,0,1,0.5,0.5,N,Internal,Y,N
+Outside: Friends Eating,3,1.5,2,4,-0.5,0,10,0,1,0.5,0.5,N,Internal,Y,N
+Taking headache medicine,1,3,0,0,0,0,0,0,NA,NA,NA,N,Internal,N,N
+Taking sleeping pill,-10,0,0,0,0,0,0,0,NA,NA,NA,N,Internal,N,N
+Napping,1,4,0,0,0,0,0,0,10,1,1,N,Internal,Y,N
+Moving In,-1,0,0,0,0,0,0,0,1,0,0,N,Internal,Y,N
